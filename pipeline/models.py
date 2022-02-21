@@ -28,3 +28,15 @@ class GCN(torch.nn.Module):
         x = torch_geometric.nn.global_max_pool(x, batch=data.batch)
         x = self.mlp(x)
         return x[:, 0]
+    
+    
+from timm.models.resnet import resnet18
+class ModelResnet18(nn.Module):
+    def __init__(self, num_features):
+        super(self.__class__, self).__init__()
+        self.model = resnet18(pretrained=False)
+        self.model.conv1 = nn.Conv2d(num_features, 64, kernel_size=(5, 5), stride=(2, 2), padding=(2, 2), bias=False)
+        self.model.fc = nn.Linear(in_features=512, out_features=1, bias=True)
+        
+    def forward(self, x):
+        return self.model.forward(x)[:, 0]

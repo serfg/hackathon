@@ -33,7 +33,7 @@ from sklearn.metrics import roc_auc_score, f1_score
 
 class Trainer(object):
     def __init__(self, model, opt, scheduler, train_loader, val_loader, num_epochs,
-                 weight=10.0, step='step', backup_by='adaptive_f1',
+                 graph_data=True, weight=10.0, step='step', backup_by='adaptive_f1',
                  logs_path='./logs', path_to_save='./ckpt', exp_name='test', verbose=2):
         self.model = model
         self.opt = opt
@@ -53,7 +53,7 @@ class Trainer(object):
         self.writer = SummaryWriter(log_dir=os.path.join(self.logs_path, self.exp_name))
         
         self.num_epochs, self.backup_by = num_epochs, backup_by
-        self.verbose, self.epoch, self.best_epoch = verbose, 0, 0
+        self.graph_data, self.verbose, self.epoch, self.best_epoch = graph_data, verbose, 0, 0
         
         
     def save_checkpoint(self):
@@ -66,7 +66,7 @@ class Trainer(object):
         def _f1(logits, targets, thr):
             return f1_score(targets, outputs > thr)
 
-        outputs = (1.0 / np.exp(-logits + 1.0))
+        outputs = (1.0 / (np.exp(-logits) + 1.0))
         thrs, f1s = np.arange(0.0, 1.0 + delta, delta), []
         for thr in thrs:
             f1s.append(_f1(outputs, targets, thr))
@@ -77,7 +77,7 @@ class Trainer(object):
     
     @staticmethod
     def roc_auc(logits, targets):
-        return roc_auc_score(targets, (1.0 / np.exp(-logits + 1.0)))
+        return roc_auc_score(targets, (1.0 / (np.exp(-logits) + 1.0)))
     
         
     def iterate_loader(self, loader, train=False):
@@ -92,12 +92,15 @@ class Trainer(object):
         with torch.set_grad_enabled(train):
                 
             for batch in generator:
-                logit = self.model.forward(batch.to(device))
+                batch_input = batch.to(device) if self.graph_data else batch['tensor'].to(device)
+                batch_target = batch.y.to(device) if self.graph_data else batch['target'].to(device)
+                
+                logit = self.model.forward(batch_input)
 
                 logits.extend(logit.detach().cpu().numpy())            
-                targets.extend(batch.y.cpu().numpy())
+                targets.extend(batch_target.cpu().numpy())
 
-                loss = F.binary_cross_entropy_with_logits(logit, batch.y.to(device).float(),
+                loss = F.binary_cross_entropy_with_logits(logit, batch_target.float(),
                                                           reduction='none',
                                                           pos_weight=self.weight.to(device))
                 losses.extend(loss.detach().cpu().numpy())
