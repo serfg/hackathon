@@ -6,6 +6,7 @@ from torch_geometric.data import Data
 
 from openbabel import pybel
 pybel.ob.obErrorLog.SetOutputLevel(0)
+from ase import Atoms
 
 
 class MoleculePybel(object):
@@ -20,6 +21,16 @@ class MoleculePybel(object):
         self._transform_diagonal()
         self.augment()
         
+       
+    def get_ase(self):
+        mol = self.molecule.OBMol
+        positions, atomic_nums = [], []
+        num_atoms = mol.NumAtoms()
+        for index in range(num_atoms):
+            atom = mol.GetAtomById(index)
+            positions.append([atom.GetX(), atom.GetY(), atom.GetZ()])
+            atomic_nums.append(atom.GetAtomicNum())
+        return Atoms(positions = positions, numbers = atomic_nums)
         
     def _process_molecule(self):
         self.molecule.addh()
